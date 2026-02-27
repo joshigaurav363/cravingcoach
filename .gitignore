@@ -1,3 +1,4 @@
 src/.streamlit/
 .venv/
 __pycache__/
+.idea/

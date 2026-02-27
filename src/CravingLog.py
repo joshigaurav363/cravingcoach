@@ -1,4 +1,3 @@
-
 import streamlit as st
 from datetime import datetime
 import pandas as pd
@@ -20,235 +19,199 @@ def init_supabase():
 supabase = init_supabase()
 
 # Initialize session state
-if 'history' not in st.session_state:
-    # Load from Supabase on startup
-    try:
-        response = supabase.table("cravings").select("*").order("created_at", desc=True).execute()
-        st.session_state.history = response.data
-    except Exception as e:
-        st.error(f"Error loading: {e}")
-        st.session_state.history = []
-
-if 'awaiting_action' not in st.session_state:
-    st.session_state.awaiting_action = False
+if 'user' not in st.session_state:
+    st.session_state.user = None
+if 'cravings' not in st.session_state:
+    st.session_state.cravings = []
+if 'show_actions' not in st.session_state:
+    st.session_state.show_actions = False
 if 'current_craving' not in st.session_state:
     st.session_state.current_craving = ""
-if 'temp_craving' not in st.session_state:
-    st.session_state.temp_craving = ""
-
-# Title
-st.title("🍽️ Cravings Coach")
-
-# DEBUG: Show current state
-st.write("DEBUG - Awaiting action:", st.session_state.awaiting_action)
-st.write("DEBUG - Current craving:", st.session_state.current_craving)
-
-# Create two columns for layout
-left_col, right_col = st.columns([1, 1])
-
-with left_col:
-    st.subheader("Log Your Craving")
-
-    # Input section - store in temp_craving first
-    craving = st.text_input("What are you craving?", value=st.session_state.temp_craving, key="craving_input")
-    st.session_state.temp_craving = craving
-    st.write("DEBUG - You typed:", craving)
-
-    # Only log when they click "Log It" button
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📝 Log Craving", use_container_width=True):
-            st.write("DEBUG - Log button clicked")
-            if craving and craving.strip():
-                st.write("DEBUG - Setting current craving to:", craving)
-                st.session_state.current_craving = craving
-                st.session_state.awaiting_action = True
-                st.session_state.temp_craving = ""  # Clear input
-                st.rerun()
-            else:
-                st.warning("Please enter a craving first")
-
-    with col2:
-        if st.button("🔄 Clear", use_container_width=True):
-            st.session_state.temp_craving = ""
-            st.session_state.current_craving = ""
-            st.session_state.awaiting_action = False
-            st.rerun()
-
-    # Show action buttons only when awaiting action
-    if st.session_state.awaiting_action and st.session_state.current_craving:
-        st.subheader(f"What will you do about **{st.session_state.current_craving}**?")
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            if st.button("💪 Pushups", use_container_width=True):
-                st.write("DEBUG - Pushups clicked")
-                # Save to Supabase
-                new_entry = {
-                    "craving_item": st.session_state.current_craving,
-                    "created_at": datetime.now().isoformat(),
-                    "action_taken": "pushups",
-                    "success": True
-                }
-                try:
-                    result = supabase.table("cravings").insert(new_entry).execute()
-                    st.write("DEBUG - Saved to Supabase")
-                    # Refresh history
-                    response = supabase.table("cravings").select("*").order("created_at", desc=True).execute()
-                    st.session_state.history = response.data
-                    st.success("✅ Saved! Try 10 pushups now 💪")
-                except Exception as e:
-                    st.error(f"Error saving: {e}")
-
-                # Reset state
-                st.session_state.awaiting_action = False
-                st.session_state.current_craving = ""
-                st.rerun()
-
-        with col2:
-            if st.button("💧 Water", use_container_width=True):
-                st.write("DEBUG - Water clicked")
-                new_entry = {
-                    "craving_item": st.session_state.current_craving,
-                    "created_at": datetime.now().isoformat(),
-                    "action_taken": "water",
-                    "success": True
-                }
-                try:
-                    result = supabase.table("cravings").insert(new_entry).execute()
-                    st.write("DEBUG - Saved to Supabase")
-                    response = supabase.table("cravings").select("*").order("created_at", desc=True).execute()
-                    st.session_state.history = response.data
-                    st.success("✅ Saved! Drink a full glass of water 💧")
-                except Exception as e:
-                    st.error(f"Error saving: {e}")
-
-                st.session_state.awaiting_action = False
-                st.session_state.current_craving = ""
-                st.rerun()
-
-        with col3:
-            if st.button("🥜 Healthy Snack", use_container_width=True):
-                st.write("DEBUG - Snack clicked")
-                new_entry = {
-                    "craving_item": st.session_state.current_craving,
-                    "created_at": datetime.now().isoformat(),
-                    "action_taken": "healthy snack",
-                    "success": True
-                }
-                try:
-                    result = supabase.table("cravings").insert(new_entry).execute()
-                    st.write("DEBUG - Saved to Supabase")
-                    response = supabase.table("cravings").select("*").order("created_at", desc=True).execute()
-                    st.session_state.history = response.data
-                    st.success("✅ Saved! Try roasted chana or fruits 🥜")
-                except Exception as e:
-                    st.error(f"Error saving: {e}")
-
-                st.session_state.awaiting_action = False
-                st.session_state.current_craving = ""
-                st.rerun()
-
-with right_col:
-    st.subheader("📊 Your Cravings Dashboard")
-
-    # Show history
-    if st.session_state.history:
-        st.write("DEBUG - History has", len(st.session_state.history), "entries")
-
-        # Convert to DataFrame for better display
-        df = pd.DataFrame(st.session_state.history)
-
-        # Show recent entries
-        if 'craving_item' in df.columns:
-            display_df = df[['craving_item', 'created_at', 'action_taken']].copy()
-            display_df['created_at'] = pd.to_datetime(display_df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
-            st.dataframe(display_df.head(10), use_container_width=True)
-        else:
-            st.dataframe(df.head(10))
 
 
-        # Initialize Supabase
-        @st.cache_resource
-        def init_supabase():
-            return create_client(
-                st.secrets["SUPABASE_URL"],
-                st.secrets["SUPABASE_KEY"]
-            )
+# Authentication functions
+def sign_in(email, password):
+    try:
+        response = supabase.auth.sign_in_with_password({
+            "email": email,
+            "password": password
+        })
+        return response
+    except Exception as e:
+        st.error(f"Login error: {e}")
+        return None
 
 
-        supabase = init_supabase()
-
-        # Initialize session state
-        if 'history' not in st.session_state:
-            # Load from Supabase on startup
-            try:
-                response = supabase.table("cravings").select("*").order("created_at", desc=True).execute()
-                st.session_state.history = response.data
-                # DEBUG: Print what we got
-                st.write("DEBUG - Raw data from Supabase:", response.data)
-                if response.data:
-                    st.write("DEBUG - First item keys:", response.data[0].keys())
-            except Exception as e:
-                st.error(f"Error loading: {e}")
-                st.session_state.history = []
-
-        # Simple analytics
-        st.subheader("📈 Insights")
-
-        col1, col2 = st.columns(2)
-        with col1:
-            # Total cravings
-            st.metric("Total Cravings", len(df))
-
-        with col2:
-            # Most common craving
-            if 'craving_item' in df.columns and len(df) > 0:
-                top_craving = df['craving_item'].mode()[0] if not df['craving_item'].mode().empty else "None"
-                st.metric("Most Common", top_craving)
-
-        # Actions breakdown
-        if 'action_taken' in df.columns and not df['action_taken'].isna().all():
-            st.subheader("Actions Taken")
-            action_counts = df['action_taken'].value_counts()
-            st.bar_chart(action_counts)
-    else:
-        st.info("No cravings logged yet. Start by logging one!")
-
-# Sidebar with stats
-with st.sidebar:
-    st.header("📋 Quick Stats")
-    if st.session_state.history:
-        df = pd.DataFrame(st.session_state.history)
-        st.write(f"Total entries: {len(df)}")
-
-        # Today's count
-        if 'created_at' in df.columns:
-            today = datetime.now().strftime('%Y-%m-%d')
-            df['date'] = pd.to_datetime(df['created_at']).dt.strftime('%Y-%m-%d')
-            today_count = len(df[df['date'] == today])
-            st.write(f"Today: {today_count} cravings")
-
-        # Clear button (for testing)
-        if st.button("🔄 Refresh Data"):
-            response = supabase.table("cravings").select("*").order("created_at", desc=True).execute()
-            st.session_state.history = response.data
-            st.rerun()
-    else:
-        st.write("No data yet")
+def sign_up(email, password):
+    try:
+        response = supabase.auth.sign_up({
+            "email": email,
+            "password": password
+        })
+        return response
+    except Exception as e:
+        st.error(f"Sign up error: {e}")
+        return None
 
 
-# Add this somewhere in your app, maybe after the action buttons
-with st.expander("🧪 Test Database"):
-    if st.button("Test Save to Supabase"):
-        test_entry = {
-            "craving_item": "test craving",
+def sign_out():
+    supabase.auth.sign_out()
+    st.session_state.user = None
+    st.session_state.cravings = []
+    st.session_state.show_actions = False
+    st.session_state.current_craving = ""
+
+
+# Load user's cravings
+def load_cravings(user_id):
+    try:
+        response = supabase.table("cravings") \
+            .select("*") \
+            .eq("user_id", user_id) \
+            .order("created_at", desc=True) \
+            .execute()
+        return response.data
+    except Exception as e:
+        st.error(f"Error loading: {e}")
+        return []
+
+
+# Save a new craving
+def save_craving(user_id, craving_item, action):
+    try:
+        new_entry = {
+            "user_id": user_id,
+            "craving_item": craving_item,
             "created_at": datetime.now().isoformat(),
-            "action_taken": "test",
+            "action_taken": action,
             "success": True
         }
-        try:
-            result = supabase.table("cravings").insert(test_entry).execute()
-            st.success(f"Test saved! Response: {result}")
-        except Exception as e:
-            st.error(f"Test failed: {e}")
+        result = supabase.table("cravings").insert(new_entry).execute()
+        return True
+    except Exception as e:
+        st.error(f"Error saving: {e}")
+        return False
+
+
+# Authentication UI
+if not st.session_state.user:
+    st.title("🍽️ Cravings Coach")
+
+    tab1, tab2 = st.tabs(["Login", "Sign Up"])
+
+    with tab1:
+        email = st.text_input("Email", key="login_email")
+        password = st.text_input("Password", type="password", key="login_password")
+        if st.button("Login", key="login_btn"):
+            with st.spinner("Logging in..."):
+                response = sign_in(email, password)
+                if response:
+                    st.session_state.user = response.user
+                    st.session_state.cravings = load_cravings(response.user.id)
+                    st.rerun()
+
+    with tab2:
+        new_email = st.text_input("Email", key="signup_email")
+        new_password = st.text_input("Password", type="password", key="signup_password")
+        confirm = st.text_input("Confirm Password", type="password", key="confirm_password")
+        if st.button("Sign Up", key="signup_btn"):
+            if new_password != confirm:
+                st.error("Passwords don't match")
+            else:
+                with st.spinner("Creating account..."):
+                    response = sign_up(new_email, new_password)
+                    if response:
+                        st.success("Account created! Please login.")
+
+    st.stop()
+
+# ===== MAIN APP =====
+
+# Sidebar
+with st.sidebar:
+    st.header(f"👤 {st.session_state.user.email}")
+    if st.button("🚪 Logout"):
+        sign_out()
+        st.rerun()
+
+    st.divider()
+    st.header("📊 Stats")
+    st.write(f"Total cravings: {len(st.session_state.cravings)}")
+
+    if st.button("🔄 Refresh"):
+        st.session_state.cravings = load_cravings(st.session_state.user.id)
+        st.rerun()
+
+# Main content
+st.title("🍽️ Cravings Coach")
+
+# Input section
+col1, col2 = st.columns([3, 1])
+with col1:
+    craving_input = st.text_input("What are you craving?", placeholder="e.g., chips, chocolate...")
+with col2:
+    if st.button("📝 Log Craving", type="primary", use_container_width=True):
+        if craving_input and craving_input.strip():
+            st.session_state.current_craving = craving_input
+            st.session_state.show_actions = True
+            st.rerun()
+        else:
+            st.warning("Enter a craving")
+
+# Action buttons (shown only when needed)
+if st.session_state.show_actions and st.session_state.current_craving:
+    st.subheader(f"What to do about **{st.session_state.current_craving}**?")
+
+    a1, a2, a3 = st.columns(3)
+
+    with a1:
+        if st.button("💪 Pushups", key="push", use_container_width=True):
+            if save_craving(st.session_state.user.id, st.session_state.current_craving, "pushups"):
+                st.session_state.cravings = load_cravings(st.session_state.user.id)
+                st.success("✅ Saved! Do 10 pushups")
+                st.session_state.show_actions = False
+                st.session_state.current_craving = ""
+                st.rerun()
+
+    with a2:
+        if st.button("💧 Water", key="water", use_container_width=True):
+            if save_craving(st.session_state.user.id, st.session_state.current_craving, "water"):
+                st.session_state.cravings = load_cravings(st.session_state.user.id)
+                st.success("✅ Saved! Drink water")
+                st.session_state.show_actions = False
+                st.session_state.current_craving = ""
+                st.rerun()
+
+    with a3:
+        if st.button("🥜 Healthy Snack", key="snack", use_container_width=True):
+            if save_craving(st.session_state.user.id, st.session_state.current_craving, "healthy snack"):
+                st.session_state.cravings = load_cravings(st.session_state.user.id)
+                st.success("✅ Saved! Have a healthy snack")
+                st.session_state.show_actions = False
+                st.session_state.current_craving = ""
+                st.rerun()
+
+# Dashboard
+st.divider()
+st.subheader("📊 Your Cravings")
+
+if st.session_state.cravings:
+    df = pd.DataFrame(st.session_state.cravings)
+
+    # Show table
+    if 'craving_item' in df.columns:
+        show_df = df[['craving_item', 'created_at', 'action_taken']].copy()
+        show_df['created_at'] = pd.to_datetime(show_df['created_at']).dt.strftime('%Y-%m-%d %H:%M')
+        show_df.columns = ['Craving', 'Time', 'Action']
+        st.dataframe(show_df, use_container_width=True, hide_index=True)
+
+    # Quick stats
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Total", len(df))
+    with col2:
+        if 'craving_item' in df.columns:
+            top = df['craving_item'].mode()[0] if len(df) > 0 else "None"
+            st.metric("Top Craving", top)
+else:
+    st.info("No cravings yet. Log your first one above!")
